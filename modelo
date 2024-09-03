@@ -1,0 +1,113 @@
+code = """#importar libs
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_samples, silhouette_score
+from sklearn.decomposition import PCA
+
+# Carregar df
+df = pd.read_csv('StudentPerformanceFactors.csv')
+df_encoded = pd.get_dummies(df)
+scaler = StandardScaler()
+x = scaler.fit_transform(df_encoded)
+
+# Reduzir a dimensão
+pca = PCA(n_components=5)
+x_reduced = pca.fit_transform(x)
+
+sse = []
+for n_clusters in range(2, 16):
+    kmeans = KMeans(n_clusters=n_clusters, random_state=10)
+    kmeans.fit(x_reduced)
+    sse.append(kmeans.inertia_)
+
+plt.plot(range(2, 16), sse, marker='o')
+plt.xlabel('Número de Clusters')
+plt.ylabel('Soma dos Quadrados das Distâncias (SSE)')
+plt.title('Método do Cotovelo')
+plt.show()
+
+# Definir o intervalo de K(classes)
+range_n_clusters = list(range(2, 15))
+
+for n_clusters in range_n_clusters:
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig.set_size_inches(18, 9)
+    
+    ax1.set_xlim([-0.1, 1])
+    ax1.set_ylim([0, len(x_reduced) + (n_clusters + 1) * 10])
+    
+    clusterer = KMeans(n_clusters=n_clusters, random_state=12)
+    cluster_labels = clusterer.fit_predict(x_reduced)
+    
+    silhouette_avg = silhouette_score(x_reduced, cluster_labels)
+    print(f'Para n_clusters = {n_clusters}, a média da pontuação de silhueta é: {silhouette_avg:.4f}')
+    
+    sample_silhouette_values = silhouette_samples(x_reduced, cluster_labels)
+    
+    y_lower = 10
+    for i in range(n_clusters):
+        ith_cluster_silhouette_values = sample_silhouette_values[cluster_labels == i]
+        ith_cluster_silhouette_values.sort()
+        size_cluster_i = ith_cluster_silhouette_values.shape[0]
+        y_upper = y_lower + size_cluster_i
+        color = plt.cm.nipy_spectral(float(i) / n_clusters)
+        ax1.fill_betweenx(np.arange(y_lower, y_upper),
+                          0, ith_cluster_silhouette_values,
+                          facecolor=color, edgecolor=color, alpha=0.7)
+        ax1.text(-0.05, (y_lower + y_upper) / 2, str(i))
+        y_lower = y_upper + 10
+
+    ax1.set_title('Valores de Silhueta para Cada Cluster')
+    ax1.set_xlabel('Valor da Silhueta')
+    ax1.set_ylabel('ID do Cluster')
+
+    ax2.scatter(x_reduced[:, 0], x_reduced[:, 1], c=cluster_labels, cmap=plt.cm.nipy_spectral, s=30, edgecolor='k')
+    ax2.set_title(f'Clusters visualizados em 2D para {n_clusters} Clusters')
+    ax2.set_xlabel('Componente 1')
+    ax2.set_ylabel('Componente 2')
+
+    plt.show()
+
+clusterer = KMeans(n_clusters=14, random_state=12)
+cluster_labels = clusterer.fit_predict(x_reduced)
+
+silhouette_avg = silhouette_score(x_reduced, cluster_labels)
+print(f'Para n_clusters = 14, a média da pontuação de silhueta é: {silhouette_avg:.4f}')
+
+df_encoded['cluster'] = cluster_labels
+cluster_summary = df_encoded.groupby('cluster').mean()  # Ou outras estatísticas, como medianas ou desvios padrão
+print(cluster_summary)
+
+
+cluster_sizes = pd.Series(cluster_labels).value_counts()
+print(cluster_sizes)
+
+from sklearn.metrics import davies_bouldin_score
+
+db_index = davies_bouldin_score(x, cluster_labels)
+print(f'Índice de Davies-Bouldin: {db_index:.4f}')
+
+fig = plt.figure(figsize=(12, 10))
+ax = fig.add_subplot(111, projection='3d')
+scatter = ax.scatter(x_reduced[:, 0], x_reduced[:, 1], x_reduced[:, 2], c=cluster_labels, cmap=plt.cm.nipy_spectral, s=30, edgecolor='k')
+plt.colorbar(scatter, label='Cluster')
+ax.set_title('Visualização dos Clusters em 3D para 13 Clusters')
+plt.show()
+
+# Criar um DataFrame com os dados e os rótulos dos clusters
+df_encoded['Cluster'] = cluster_labels
+df_encoded['PCA_Component_1'] = x_reduced[:, 0]
+df_encoded['PCA_Component_2'] = x_reduced[:, 1]
+
+# Salvar o DataFrame em um arquivo Excel
+output_filename = 'clustered_data.xlsx'
+df_encoded.to_excel(output_filename, index=False)
+
+print(f'Dados exportados para {output_filename}')
+"""
+
+with open('/content/classifymodel/clustering_code.py', 'w') as file:
+    file.write(code)
